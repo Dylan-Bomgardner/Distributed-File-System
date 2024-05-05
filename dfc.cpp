@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
     
     // Setup server address
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(10001);
+    server_addr.sin_port = htons(10002);
     
     if (inet_pton(AF_INET, SERVER_IP, &server_addr.sin_addr) <= 0) {
         perror("Invalid address / Address not supported");
@@ -30,11 +30,16 @@ int main(int argc, char **argv) {
     }
     
     // Send data to server
+    // if (send(sockfd, message, strlen(message), 0) < 0) {
+    //     perror("Send failed");
+    //     exit(EXIT_FAILURE);
+    // }
+
     if (send(sockfd, message, strlen(message), 0) < 0) {
         perror("Send failed");
         exit(EXIT_FAILURE);
     }
-    
+
     close(sockfd);
     return 0;
 }

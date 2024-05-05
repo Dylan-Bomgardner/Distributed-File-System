@@ -3,10 +3,13 @@
  */
 
 #include "nethelp.h"
+#include <iostream>
 //#include "signal.h"
 
 void echo(int connfd);
 void *thread(void *vargp);
+
+using namespace std;
 
 int main(int argc, char **argv) 
 {
@@ -23,7 +26,7 @@ int main(int argc, char **argv)
     listenfd = open_listenfd(port);
     
     while (1) {
-        printf("test\n");
+        //printf("test\n");
         connfdp = (int*) malloc(sizeof(int));
         *connfdp = accept(listenfd, (sockaddr*) &clientaddr, (socklen_t*) &clientlen);
         pthread_create(&tid, NULL, thread, connfdp);
@@ -47,7 +50,7 @@ void * thread(void * vargp)
     if((n = readline(connfd, buf, MAXLINE)) != 0);
 
     //send ack to the client.
-    write(connfd, send_buf, strlen(send_buf));
+    //write(connfd, send_buf, strlen(send_buf));
     
     extracted_string = strtok_r(buf, " ", &ptr);
     if(extracted_string == NULL) {
@@ -61,9 +64,9 @@ void * thread(void * vargp)
     strcpy(command, extracted_string);
 
     if(!strncmp(command, "get", 3)) {
-        printf("command from client is get");
+        cout << "command is get" << endl;
     }
-    else if(!strncmp(command, "ls", 3)) {
+    else if(!strncmp(command, "ls", 2)) {
         printf("command from client is ls.");
     }
     else if(!strncmp(command, "put", 3)) {
