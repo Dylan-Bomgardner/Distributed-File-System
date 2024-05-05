@@ -27,6 +27,7 @@ int main(int argc, char **argv) {
         return -1;
     }
 
+    
 
     string line;
     while (getline(file, line)) {
@@ -73,6 +74,10 @@ int main(int argc, char **argv) {
         close(sockfd);
             
     }
+    for(int i = 0, j = servers.size(); i < j; i++) {
+        if(servers[i].available == false) servers.erase(servers.begin() + i);
+    }
+    
 
     if(command == "ls") {
         ls();
@@ -91,9 +96,7 @@ int main(int argc, char **argv) {
 
     cout << "BREAK HERE" << endl;
 
-    for(int i = 0, j = servers.size(); i < j; i++) {
-        if(servers[i].available == false) servers.erase(servers.begin() + i);
-    }
+    
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Socket creation error");
@@ -144,9 +147,11 @@ void put(string filename, vector<server_t> &servers) {
     int sockfd1, sockfd2;
     char send_buf[MAXBUF];
     char send_filename[30];
+
     struct sockaddr_in server_addr, server_addr2;
     int bytes_read;
-    FILE* file = fopen(filename, "b");
+    cout << filename << endl;
+    FILE* file = fopen(filename.c_str(), "r");
     if(file == NULL) {
         cout << "Error opening file." << endl;
         return;
@@ -156,10 +161,12 @@ void put(string filename, vector<server_t> &servers) {
     long file_size = ftell(file);
     //Amount of bytes to send per chunk.
     long bytes_per_chunk = file_size / servers.size();
+    cout << "NUM SERVERS: " << servers.size();
     //Move the pointer back to the beginning.
     fseek(file, 0, SEEK_SET);
 
-    cout << "File Size: " << file_size;
+    cout << "File Size: " << file_size << endl;
+    cout << "Bytes per Chunk: " << bytes_per_chunk << endl;
     hash<string> hasher;
     int x = hasher(filename) % servers.size();
 
@@ -213,9 +220,9 @@ void put(string filename, vector<server_t> &servers) {
             close(sockfd2);
         } 
 
-
-        sprintf(send_filename, "%s_%d", filename, i);
-        sprintf(send_buf, "put %s\n");
+        
+        sprintf(send_filename, "%s_%d", filename.c_str(), i);
+        sprintf(send_buf, "put %s\n", send_filename);
         send(sockfd1, send_buf, strlen(send_buf), 0);
         send(sockfd2, send_buf, strlen(send_buf), 0);
         bzero(send_buf, sizeof(send_buf));
@@ -223,22 +230,29 @@ void put(string filename, vector<server_t> &servers) {
         int curr_chunk_size = bytes_per_chunk;
         int bytes_to_read;
 
-        if(sizeof(send_buf) > curr_chunk_size) {
+        if(sizeof(send_buf) < curr_chunk_size) {
             bytes_to_read = sizeof(send_buf);
         } else {
             bytes_to_read = curr_chunk_size;
         }
+
+        cout << "BYTES BEING READ: " << bytes_to_read << endl;
         while((bytes_read = fread(send_buf, sizeof(char), bytes_to_read, file)) > 0) {
             send(sockfd1, send_buf, bytes_read, 0);
             send(sockfd2, send_buf, bytes_read, 0);   
+            cout << "BYTES READ AND WRITTEN: " << bytes_read << endl;
 
             curr_chunk_size -= bytes_to_read;
-            if(curr_chunk_size == 0) break;
+            cout << "CHUNK LEFT: " << curr_chunk_size << endl;
+            cout << "FILE POINTER: " << file->_offset << endl;
+            if(curr_chunk_size <= 0) break;
+            
             //setting the amount of bytes to read from the file.
-            if(sizeof(send_buf) > curr_chunk_size) {
+            if(sizeof(send_buf) < curr_chunk_size) {
                 bytes_to_read = sizeof(send_buf);
             } else {
-                bytes_to_read = curr_chunk_size;
+                if(i == servers.size() - 1) bytes_to_read = curr_chunk_size + (file_size % servers.size());
+                else bytes_to_read = curr_chunk_size;
             }
         }
 
@@ -246,10 +260,98 @@ void put(string filename, vector<server_t> &servers) {
         close(sockfd1);
         close(sockfd2);
     }
-
+    fclose(file);
 
 }
 
 void get(string filename, vector<server_t> &servers) {
+
+    mkdir("./cache", 0777);
+
+    char send_buf[MAXLINE];
+    char desired_file[40];
+    int sockfd;
+    int rec, read_bytes;
+    struct sockaddr_in server_addr;
+
+    FILE* file_dest = fopen(filename.c_str(), "w");
+    for(int i = 0; i < servers.size(); i++) {
+        sprintf(desired_file, "./cache/%s_%d", filename.c_str(), i);
+        sprintf(send_buf, "get %s_%d\n", filename.c_str(), i);
+        cout << "DESIRED FILE: " << send_buf << endl;
+
+        
+        for(int j = 0; j < servers.size(); j++) {
+            //Creating the socket
+            cout << "ITERATION: " << j << endl;;
+            //cout << servers.size() << endl;
+            if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+                perror("Socket creation error");
+                exit(EXIT_FAILURE);
+            }
+            // Setup server address
+            server_addr.sin_family = AF_INET;
+            server_addr.sin_port = htons(servers[j].port);
+            //cout << servers[j].port << endl;
+            //Setting the ip dest.
+            if (inet_pton(AF_INET,  servers[j].ip.c_str(), &server_addr.sin_addr) <= 0) {
+                perror("Invalid address / Address not supported");
+                close(sockfd);
+
+            }
+            
+            // Connect to server
+            if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+                perror("Connection failed");
+                close(sockfd);
+            } 
+            sprintf(send_buf, "get %s_%d\n", filename.c_str(), i);
+            send(sockfd, send_buf, strlen(send_buf), 0);
+            bzero(send_buf, sizeof(send_buf));
+            cout << "HERE1" << endl;
+            rec = recv(sockfd, send_buf, sizeof(send_buf), 0);
+            //bzero(send_buf, sizeof(send_buf));
+            cout << "HERE" << endl;
+            cout << send_buf << endl;
+            if(!strncmp(send_buf, "yes", 3)) {
+                cout << "YES" << endl;
+                bzero(send_buf, sizeof(send_buf));
+                FILE* file = fopen(desired_file, "w");
+                while((rec = recv(sockfd, send_buf, sizeof(send_buf), 0)) > 0) {
+                    
+                    cout << "WRITING" << endl;
+                    fwrite(send_buf, sizeof(char), rec, file);
+                    bzero(send_buf, sizeof(send_buf));
+                }
+                fclose(file);
+                break;
+            }
+
+            close(sockfd);
+
+        }
+        
+        DIR *dir = opendir("./cache");
+        int count = 0;
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != NULL) {
+            if (entry->d_type == DT_REG) { // Check if the entry is a regular file
+                count++;
+            }
+        }
+        cout << count << endl;
+        if(count == 0) {
+            cout << "File cannot be completed." << endl;
+            return;
+        }
+        FILE* temp_file = fopen(desired_file, "r");
+        bzero(send_buf, sizeof(send_buf));
+        while((read_bytes = fread(send_buf, sizeof(char), sizeof(send_buf), temp_file)) > 0) {
+            fwrite(send_buf, sizeof(char), read_bytes, file_dest);
+        }
+        fclose(temp_file);
+        
+    }
+    fclose(file_dest);
     return;
 }

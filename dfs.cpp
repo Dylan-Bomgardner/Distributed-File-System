@@ -81,6 +81,41 @@ void * thread(void * vargp)
 
     if(!strncmp(command, "get", 3)) {
         cout << "command is get" << endl;
+        extracted_string = strtok_r(NULL, "\n", &ptr);
+        if(extracted_string == NULL) {
+            cout << "BAD THINGY" << endl;
+            free(vargp);
+            close(connfd);
+            return 0;
+        }
+        strcpy(filename, extracted_string);
+        cout << "FILENAME: " << filename << endl;
+        FILE* file;
+        char rec_buf[MAXLINE];
+        int bytes_received;
+        
+        bzero(send_buf, sizeof(send_buf));
+        
+        sprintf(file_dest, "%s/%s", dir, filename);
+        file = fopen(file_dest, "r");
+        if(file == NULL) {
+            cout << "NO" << endl;
+            strcpy(send_buf, "no");
+            send(connfd, send_buf, sizeof(send_buf), 0);
+            free(vargp);
+            close(connfd);
+            return 0;
+        }
+        
+        strcpy(send_buf, "yes");
+        cout << "YES" << endl;
+        if(send(connfd, send_buf, sizeof(send_buf), 0) == -1) cout << "FAILED" << endl;
+        int bytes_read;
+        while((bytes_read = fread(send_buf, sizeof(char), sizeof(send_buf), file)) > 0) {
+            cout << "READ: " << bytes_read << endl;
+            send(connfd, send_buf, bytes_read, 0);
+        }
+
     }
     else if(!strncmp(command, "ls", 2)) {
         cout << "command is ls" << endl;

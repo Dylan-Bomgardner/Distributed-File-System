@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iostream>
 #include <functional>
+#include <dirent.h>
 
 using namespace std;
 
