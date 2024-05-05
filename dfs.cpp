@@ -38,7 +38,7 @@ void * thread(void * vargp)
     char buf[MAXLINE]; 
     char send_buf[MAXLINE];
     size_t n;
-
+ s
     pthread_detach(pthread_self()); 
     
     //echo(connfd);
