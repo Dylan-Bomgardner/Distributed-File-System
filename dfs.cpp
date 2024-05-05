@@ -19,11 +19,11 @@ int main(int argc, char **argv)
         fprintf(stderr, "usage: %s ./dfs<n> <port>\n", argv[0]);
         exit(0);
     }
-    port = atoi(argv[1]);
+    port = atoi(argv[2]);
     listenfd = open_listenfd(port);
     
     while (1) {
-    //    / printf("test\n");
+        printf("test\n");
         connfdp = (int*) malloc(sizeof(int));
         *connfdp = accept(listenfd, (sockaddr*) &clientaddr, (socklen_t*) &clientlen);
         pthread_create(&tid, NULL, thread, connfdp);
@@ -37,8 +37,10 @@ void * thread(void * vargp)
     int connfd = *((int *)vargp);
     char buf[MAXLINE]; 
     char send_buf[MAXLINE];
+    char command[20];
     size_t n;
- s
+    char* extracted_string, *ptr;
+
     pthread_detach(pthread_self()); 
     
     //echo(connfd);
@@ -46,7 +48,31 @@ void * thread(void * vargp)
 
     //send ack to the client.
     write(connfd, send_buf, strlen(send_buf));
+    
+    extracted_string = strtok_r(buf, " ", &ptr);
+    if(extracted_string == NULL) {
+        printf("No message in the socket\n");
 
+        free(vargp);
+        close(connfd);
+        return 0;
+    }
+
+    strcpy(command, extracted_string);
+
+    if(!strncmp(command, "get", 3)) {
+        printf("command from client is get");
+    }
+    else if(!strncmp(command, "ls", 3)) {
+        printf("command from client is ls.");
+    }
+    else if(!strncmp(command, "put", 3)) {
+        printf("command from client is put.");
+    }
+    else {
+        printf("not either\n");
+    }
+    
 
     //free dynamic arg and the close the socket.
     free(vargp);
