@@ -22,6 +22,18 @@ int main(int argc, char **argv)
         fprintf(stderr, "usage: %s ./dfs<n> <port>\n", argv[0]);
         exit(0);
     }
+
+    //read the config file. 
+
+
+    int status = mkdir(argv[1], 0777);
+    if(status == 0) {
+        cout << "Directory: " << argv[1] << " created." << endl;
+    }
+    else {
+        cout << "Directory: " << argv[1] << " already created." << endl;
+    }
+
     port = atoi(argv[2]);
     listenfd = open_listenfd(port);
     
@@ -43,6 +55,7 @@ void * thread(void * vargp)
     char command[20];
     size_t n;
     char* extracted_string, *ptr;
+    string filename;
 
     pthread_detach(pthread_self()); 
     
@@ -67,13 +80,21 @@ void * thread(void * vargp)
         cout << "command is get" << endl;
     }
     else if(!strncmp(command, "ls", 2)) {
-        printf("command from client is ls.");
+        cout << "command is ls" << endl;
     }
     else if(!strncmp(command, "put", 3)) {
-        printf("command from client is put.");
+        cout << "command is put" << endl;
+        extracted_string = strtok_r(NULL, "\n", &ptr);
+        filename = extracted_string;
+
+        FILE* file;
+         while ((bytes_received = recv(sockfd, buffer, sizeof(buffer), 0)) > 0) {
+            cout << buffer << endl;
+            bzero(buffer, sizeof(buffer));
+         }
     }
     else {
-        printf("not either\n");
+        cout << command not available << endl;
     }
     
 
@@ -91,11 +112,12 @@ void echo(int connfd)
 
     char http_code[30] = "200 OK";
     size_t n; 
-    char buf[MAXLINE]; 
+    char http_request[BUFSIZ];
+    char buf[MAXLINE], host_buf[MAXLINE], first_buf[MAXLINE]; 
     char send_buf[MAXLINE];
     char* extracted_string, * ptr;
     char http_type[80], index[80], http_version[80];
-    char* document_root = "./www";
+    char* cache_location = "./cache/";
     char content_type[20];
     char content_length[20];
     char file_location[100];
@@ -103,148 +125,250 @@ void echo(int connfd)
     FILE *file_ptr;
     struct stat st;
     int bytes_read;
+    char hostname[100];
 
     int counter = 0;
-    if((n = readline(connfd, buf, MAXLINE)) != 0) {
-        printf("server received %d bytes\n", n);
-        extracted_string = strtok_r(buf, " ", &ptr);
-        
-        if(extracted_string == NULL) {
-            printf("test1\n");
-            bzero(http_code, sizeof(http_code));
-            strcpy(http_code, "400 Bad Request");
-            strcpy(content_length, "Content-Length: 0");
-            sprintf(send_buf, "%s %s\r\n%s\r\n", "HTTP/1.1", http_code, content_length);
-           // printf("THING: %s\n", send_buf);
-            write(connfd, send_buf, strlen(send_buf));
-            return;
-        }
-        strcpy(http_type, extracted_string);
-        extracted_string = strtok_r(NULL, " ", &ptr);
-        if(extracted_string == NULL) {
-            printf("test2\n");
-            bzero(http_code, sizeof(http_code));
-            strcpy(http_code, "400 Bad Request");
-            strcpy(content_length, "Content-Length: 0");
-            sprintf(send_buf, "%s %s\r\n%s\r\n", "HTTP/1.1", http_code, content_length);
-           // printf("THING: %s\n", send_buf);
-            write(connfd, send_buf, strlen(send_buf));
-            return;
-        }
-        strcpy(index, extracted_string);
-        extracted_string = strtok_r(NULL, "\r", &ptr);
-        if(extracted_string == NULL) {
-            printf("test3\n");
-            bzero(http_code, sizeof(http_code));
-            strcpy(http_code, "400 Bad Request");
-            strcpy(content_length, "Content-Length: 0");
-            sprintf(send_buf, "%s %s\r\n%s\r\n", "HTTP/1.1", http_code, content_length);
-           // printf("THING: %s\n", send_buf);
-            write(connfd, send_buf, strlen(send_buf));
-            return;
-        }
-        strcpy(http_version, extracted_string);
+    int prev_n = 0;
+    n = recv(connfd, http_request, MAXLINE, 0);
+   // printf("buf %s\n", buf);
+    //memcpy(http_request + prev_n, buf, n);
+    //printf("HTTP REQUEST: %s", http_request);
+    
 
-        printf("http_type: %s, index: %s, ver: %s\n", http_type, index, http_version);
-        
-        //Error Handling for not GET
-        if(strncmp(http_type, "GET", 3)) {
-            bzero(http_code, sizeof(http_code));
-            strcpy(http_code, "405 Method Not Allowed");
-        }
+    //printf("%s", http_request);
+    
 
-        //Error Handling for a version other than 1.0 or 1.1
-        if(strncmp(http_version, "HTTP/1.1", 8) && strncmp(http_version, "HTTP/1.0", 8)) {
-            printf("test HERE %s\n", http_version);
-            bzero(http_code, sizeof(http_code));
-            strcpy(http_code, "505 HTTP Version Not Supported");
-        }
-        //printf("test\n");
-        //Send error back in case there is an error so far
-        //printf("CODE: %s\n", http_version);
-        if(strncmp(http_code, "200", 3)) {
-            printf("test\n");
-            strcpy(content_length, "Content-Length: 0");
-            sprintf(send_buf, "%s %s\r\n%s\r\n", http_version, http_code, content_length);
-            printf("THING: %s\n", send_buf);
-            write(connfd, send_buf, strlen(send_buf));
-            return;
-        }
-
-        //get the file location and add it to the variable..
-        if(!strcmp(index, "/")) {
-            bzero(index, sizeof(index));
-            strcpy(index, "/index.html");
-        }
-        sprintf(file_location, "%s%s", document_root, index);
-        printf("%s\n", file_location);
-        if(access(file_location, F_OK) != -1) {
-            //printf("FILE EXISTS\n");
-        }
-        else {
-            printf("file does not exist\n");
-            bzero(http_code, sizeof(http_code));
-            strcpy(http_code, "404 Not Found");
-            strcpy(content_length, "Content-Length: 0");
-            sprintf(send_buf, "%s %s\r\n%s\r\n", http_version, http_code, content_length);                
-            write(connfd, send_buf, strlen(send_buf));
-            return;
-        }
-
-        file_ptr = fopen(file_location, "r");
-        if(file_ptr == NULL) {
-            printf("Permission issue opening the file.\n");
-            bzero(http_code, sizeof(http_code));
-            strcpy(http_code, "403 Forbidden");
-            strcpy(content_length, "Content-Length: 0");
-            sprintf(send_buf, "%s %s\r\n%s\r\n", http_version, http_code, content_length);                
-            write(connfd, send_buf, strlen(send_buf));
-            return;
-        }
-
-        //get length of the file.
-        if(stat(file_location, &st) == 0) {
-            printf("Content-Length: %lld\n", (long long)st.st_size);
-            sprintf(content_length, "Content-Length: %lld", (long long)st.st_size);
-        } 
-        else {
-            printf("Error here.\n");
-        }
-        //get the file extension
-        const char* file_substrings = strrchr(file_location, '.');
-        strcpy(file_extension, file_substrings + 1);
-
-        printf("file extension: %s\n", file_extension);
-        if(!strcmp(file_extension, "html")) strcpy(content_type, "Content-Type: text/html");
-        else if(!strcmp(file_extension, "txt")) strcpy(content_type, "Content-Type: text/plain");
-        else if(!strcmp(file_extension, "png")) strcpy(content_type, "Content-Type: image/png");
-        else if(!strcmp(file_extension, "gif")) strcpy(content_type, "Content-Type: image/gif");
-        else if(!strcmp(file_extension, "jpg")) strcpy(content_type, "Content-Type: image/jpg");
-        else if(!strcmp(file_extension, "ico")) strcpy(content_type, "Content-Type: image/x-icon");
-        else if(!strcmp(file_extension, "css")) strcpy(content_type, "Content-Type: text/css");
-        else if(!strcmp(file_extension, "js")) strcpy(content_type, "Content-Type: application/javascript");
-        else {
-            printf("File Extension not supported.\n");
-            bzero(http_code, sizeof(http_code));
-            strcpy(http_code, "403 Forbidden");
-            strcpy(content_length, "Content-Length: 0");
-            sprintf(send_buf, "%s %s\r\n%s\r\n", http_version, http_code, content_length);                
-            write(connfd, send_buf, strlen(send_buf));
-            return;
-        }
-        //Construct HTTP Header
-
-        sprintf(send_buf, "%s %s\r\n%s\r\n%s\r\n\r\n", http_version, http_code, content_type, content_length);
+    //printf("server received %d bytes\n", n);
+    
+    //return;
+    strcpy(first_buf, http_request);
+    strcpy(buf, http_request);
+    extracted_string = strtok_r(buf, " ", &ptr);
+       
+    if(extracted_string == NULL) {
+        printf("test1\n");
+        bzero(http_code, sizeof(http_code));
+        strcpy(http_code, "400 Bad Request");
+        strcpy(content_length, "Content-Length: 0");
+        sprintf(send_buf, "%s %s\r\n%s\r\n", "HTTP/1.1", http_code, content_length);
+        // printf("THING: %s\n", send_buf);
         write(connfd, send_buf, strlen(send_buf));
+        return;
+    }
+    strcpy(http_type, extracted_string);
+    extracted_string = strtok_r(NULL, " ", &ptr);
+    if(extracted_string == NULL) {
+        printf("test2\n");
+        bzero(http_code, sizeof(http_code));
+        strcpy(http_code, "400 Bad Request");
+        strcpy(content_length, "Content-Length: 0");
+        sprintf(send_buf, "%s %s\r\n%s\r\n", "HTTP/1.1", http_code, content_length);
+        // printf("THING: %s\n", send_buf);
+        write(connfd, send_buf, strlen(send_buf));
+        return;
+    }
+    strcpy(index, extracted_string);
+    extracted_string = strtok_r(NULL, "\r", &ptr);
+    if(extracted_string == NULL) {
+        printf("test3\n");
+        bzero(http_code, sizeof(http_code));
+        strcpy(http_code, "400 Bad Request");
+        strcpy(content_length, "Content-Length: 0");
+        sprintf(send_buf, "%s %s\r\n%s\r\n", "HTTP/1.1", http_code, content_length);
+        // printf("THING: %s\n", send_buf);
+        write(connfd, send_buf, strlen(send_buf));
+        return;
+    }
+    strcpy(http_version, extracted_string);
+
+    printf("http_type: %s, index: %s, ver: %s\n", http_type, index, http_version);
+    
+    //Error Handling for not GET
+    if(strncmp(http_type, "GET", 3)) {
+        printf("test HERE %s\n", http_version);
+        bzero(http_code, sizeof(http_code));
+        strcpy(http_code, "405 Method Not Allowed");
+        return;
+    }
+
+    //Error Handling for a version other than 1.0 or 1.1
+    if(strncmp(http_version, "HTTP/1.1", 8) && strncmp(http_version, "HTTP/1.0", 8)) {
+        printf("test HERE %s\n", http_version);
+        bzero(http_code, sizeof(http_code));
+        strcpy(http_code, "505 HTTP Version Not Supported");
+        return;
+    }
+
+    // Test if the requested URL exists
+    //bzero(buf, sizeof(buf));
+    struct hostent *host_info;
+    //readline(connfd, host_buf, MAXLINE);
+    
+    extracted_string = strtok_r(first_buf, "\n", &ptr);
+    extracted_string = strtok_r(NULL, "\n", &ptr);
+    strcpy(host_buf, extracted_string);
+    printf("HOST BUF%s\n", host_buf);
+    extracted_string = strtok_r(host_buf, " ", &ptr);
+    if(extracted_string != NULL) {
+        extracted_string = strtok_r(NULL, ":", &ptr);
+        if(extracted_string != NULL) {
+            strcpy(hostname, extracted_string);
+            printf("%s\n", hostname);
+            remove_trailing_whitespace(hostname);
+            remove_crlf(hostname);
+            host_info = gethostbyname(hostname);
+            printf("%s\n", hostname);
+            if(host_info == NULL) {
+                printf("cannot get host name\n");
+                bzero(http_code, sizeof(http_code));
+                strcpy(http_code, "404 Not Found");
+                strcpy(content_length, "Content-Length: 0");
+                sprintf(send_buf, "%s %s\r\n%s\r\n", "HTTP/1.1", http_code, content_length);
+            // printf("THING: %s\n", send_buf);
+                write(connfd, send_buf, strlen(send_buf));  
+                return;
+            }
+            else {
+                printf("IP: %s\n", inet_ntoa(*(struct in_addr*)host_info->h_addr_list[0]));
+            }                                                                                                                                                   
+        }                                                                             
+    }
+    
+    //Check if the host name or ip is in the block list.
+    file_ptr = fopen("blocklist", "r");
+    char line[MAXLINE];
+    char ip_addr[20];
+    sprintf(ip_addr, "%s", inet_ntoa(*(struct in_addr*)host_info->h_addr_list[0]));
+    if(file_ptr == NULL) {
+        printf("Error opening the blocklist file.\n");
+        return;
+    }
+    //printf("TEST TEST TEST\n");
+    while(fgets(line, sizeof(line), file_ptr) != NULL) {
+        // printf("LINE: %s\n",line);
         
-        //Now start sending the contents of the file.
-        char line[MAXLINE];
-        while ((bytes_read = fread(line, 1, MAXLINE, file_ptr)) > 0) {
-            bzero(send_buf, sizeof(send_buf));
-            memcpy(send_buf, line, bytes_read);
-            write(connfd, send_buf, bytes_read);
+        // printf("Hostname: %s\n", hostname);
+        // printf("STRLEN: %d", strlen(line));
+        if(!strncmp(line, hostname, strlen(line) - 1)) {
+            printf("Hostname %s found in the blockfile\n", hostname);
+            bzero(http_code, sizeof(http_code));
+            strcpy(http_code, "403 Forbidden");
+            strcpy(content_length, "Content-Length: 0");
+            sprintf(send_buf, "%s %s\r\n%s\r\n", http_version, http_code, content_length);                
+            write(connfd, send_buf, strlen(send_buf));
+            return;
         }
-        fclose(file_ptr);
+        if(!strncmp(line, ip_addr, strlen(line) - 1)) {
+            printf("IP %s found in the blockfile\n", ip_addr);
+            bzero(http_code, sizeof(http_code));
+            strcpy(http_code, "403 Forbidden");
+            strcpy(content_length, "Content-Length: 0");
+            sprintf(send_buf, "%s %s\r\n%s\r\n", http_version, http_code, content_length);                
+            write(connfd, send_buf, strlen(send_buf));
         return;
         }
+        bzero(line, sizeof(line));
+    }
+    fclose(file_ptr);
+
+    //create a socket that will connect.
+    //test to see if the name is in the cache
+    //cache["netsys.cs.colorado.edu"] = 0;
+
+    //calcualte the hash of index
+    size_t index_hash_num = hash<string>{}(index);
+    printf("INDEX HASH%d\n", index_hash_num);
+    char index_hash[100];
+    sprintf(index_hash, "%d", index_hash_num);
+    printf("test\n");
+
+    time_t curr_time = std::time(nullptr);
+    double diff;
+    int bytes_readd;
+    sprintf(file_location, "%s%s", cache_location, index_hash);
+    printf("FILE LOCATION %s\n", file_location);
+    bzero(buf, sizeof(buf));
+    char* result = strchr(index, '?');
+    if(cache.count(index_hash) > 0 && result == NULL) {
+        if((diff = difftime( curr_time, *cache[index_hash])) < timeout) {
+            cout << "DIFFERENCE IN TIME: " << diff << endl;
+            printf("FILE IN CACHE GOOD\n");
+            file_ptr = fopen(file_location, "r");
+            while((bytes_readd = fread(buf, sizeof(char), sizeof(buf), file_ptr)) > 0) {
+                write(connfd, buf, bytes_readd);
+            }
+            return;
+        }
+        else {
+            if(filesystem::exists(file_location)) {
+                printf("DELETING CACHE FILE\n");
+                filesystem::remove(file_location);
+            }
+            delete cache[index_hash];
+            cache.erase(index_hash);
+            cout << "EXISTS IN CACHE TIMER RAN OUT" << endl;
+        }
+    }
+    else {
+        cout << "NOT IN CACHE" << endl;
+    }
+    time_t* new_timer = new time_t;
+    //set the timer to the current time.
+    *new_timer = time(nullptr);
+    cache[index_hash] = new_timer;
+    //receive the data from the server
+    int sockfd;
+    struct sockaddr_in server_addr;
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        
+        perror("Error creating socket");
+        exit(EXIT_FAILURE);
+    }
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(80);
+    inet_pton(AF_INET, inet_ntoa(*(struct in_addr*)host_info->h_addr_list[0]), &server_addr.sin_addr);
+
+    if (connect(sockfd, (const sockaddr*) &server_addr, sizeof(server_addr)) < 0) {
+        printf("Error connecting to server\n");
+        close(sockfd);
+        return;
+    } 
+    //printf("Connected to server at %s:%d\n", inet_ntoa(*(struct in_addr*)host_info->h_addr_list[0]), 80);
+
+    //printf("BUF: %s", first_buf);
+
+    //send the data to the client.
+    // strcpy(content_length, "Content-Length: 0");
+    bzero(send_buf, sizeof(send_buf));
+    sprintf(send_buf, "%s\r\n", first_buf);
+    if(send(sockfd, http_request, strlen(http_request), 0) < 0) {
+        printf("Error sending to server\n");
+        close(sockfd);
+        return;
+    }
+
+    
+    printf("SENT\n");
+    int bytes_received;
+    char buffer[MAXLINE];
+    file_ptr = fopen(file_location, "w");
+
+
+    while ((bytes_received = recv(sockfd, buffer, sizeof(buffer), 0)) > 0) {
+    // Null-terminate received data to use it as a string
+    //printf("test\n");
+    fwrite(buffer, sizeof(byte), bytes_received, file_ptr);
+    // Print received data
+    //printf("RECEIVED DATA:%s\n", buffer);
+    write(connfd, buffer, bytes_received);
+    bzero(buffer, sizeof(buffer));
+}
+    //printf("INDEX: %s\n", index);
+    
+    printf("DONE\n");
+    fclose(file_ptr);
+    return;
+
 }

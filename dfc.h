@@ -9,7 +9,20 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <vector>
+#include <string>
+#include <sstream>
+#include <fstream>
+#include <iostream>
+using namespace std;
 
 #define MAXLINE  8192  /* max text line length */
 #define MAXBUF   8192  /* max I/O buffer size */
 #define LISTENQ  1024  /* second argument to listen() */
+
+struct server_t {
+    string name;
+    string ip;
+    uint16_t port;
+    bool available;
+};
