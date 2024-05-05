@@ -14,6 +14,8 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <functional>
+
 using namespace std;
 
 #define MAXLINE  8192  /* max text line length */
@@ -26,3 +28,9 @@ struct server_t {
     uint16_t port;
     bool available;
 };
+
+void ls();
+
+void get(string filename, vector<server_t> &servers);
+
+void put(string filename, vector<server_t> &servers);
