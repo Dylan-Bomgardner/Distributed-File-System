@@ -171,16 +171,89 @@ void ls(vector<server_t> &servers) {
             close(sockfd);
         } 
 
-        send(sockfd, "ls", strlen("ls"), 0);
+        send(sockfd, "ls t\n", strlen("ls t\n"), 0);
         recv(sockfd, recv_buf, sizeof(recv_buf), 0);
         extracted_string = strtok_r(recv_buf, "\n", &ptr);
+        // cout << recv_buf << endl;
+        //cout << extracted_string << endl;
+
+   
+
+        string extractedFilename;
         while((extracted_string = strtok_r(NULL, "\n", &ptr)) != NULL) {
             cout << extracted_string << endl;
+            string file = extracted_string;
+            string::size_type underscorePos = file.find('_');
+
+            if (underscorePos != std::string::npos) {
+                extractedFilename = file.substr(0, underscorePos);
+                cout << "Extracted filename: " << extractedFilename << endl;
+            } else {
+                cout << "Underscore not found in the filename." << endl;
+            }
+            
+            //add it to the front list.
+            if(dirs.size() == 0) {
+                dir_list temp_dir;
+                temp_dir.name = "FIRST";
+                temp_dir.list.push_back("first");
+                dirs.push_back(temp_dir);
+            }
+            for(int j = 0; j < dirs.size(); j++) {
+                ///cout << "TEST" << endl;
+                if(dirs[j].name == extractedFilename) {
+                    
+                    break;
+                }
+                if(j == (dirs.size() - 1)) {
+                    
+                    // dir_list temp_dir;
+                    // temp_dir.name = extractedFilename;
+                    dirs.push_back({extractedFilename, {"first"}});
+                }            
+            }
+            for(int j = 0; j < dirs.size(); j++) {
+                //cout << "in: " << dirs[j].name << endl;
+                if(extractedFilename != dirs[j].name) continue;
+                for(int k = 0; k < dirs[j].list.size(); k++) {
+                    //cout << "looking at: " << dirs[j].list[k] << endl;
+                    //cout << "file: " << file << endl;
+                    if((dirs[j].list)[k] == file) {
+                        break;
+                    }
+                    if(k == (dirs[j].list.size() - 1)) {
+                        dirs[j].list.push_back(file);
+                    }
+                }
+            }
+
         }
+        
 
         close(sockfd);
 
     }
+    // cout << "TEST" << endl;
+    dirs.erase(dirs.begin());
+    for(int i = 0; i < dirs.size(); i++) {
+        dirs[i].list.erase(dirs[i].list.begin());
+    }
+    for(int i = 0; i < dirs.size(); i++) {
+        cout << "TITLE ";
+        
+        cout << dirs[i].name;
+        if(dirs[i].list.size() == servers.size()) {
+            cout << ": " << "[Complete]" << endl;
+        } else {
+            cout << ": " << "[Incomplete]" << endl;
+        }
+        
+        for (string element : dirs[i].list) {
+        std::cout << element << std::endl;
+    }
+    }
+
+
     return;
 }
 

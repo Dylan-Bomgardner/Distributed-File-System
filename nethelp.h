@@ -12,6 +12,8 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <dirent.h>
+//#include <vector>
 
 #define MAXLINE  8192  /* max text line length */
 #define MAXBUF   8192  /* max I/O buffer size */
