@@ -181,13 +181,13 @@ void ls(vector<server_t> &servers) {
 
         string extractedFilename;
         while((extracted_string = strtok_r(NULL, "\n", &ptr)) != NULL) {
-            cout << extracted_string << endl;
+            //cout << extracted_string << endl;
             string file = extracted_string;
             string::size_type underscorePos = file.find('_');
 
             if (underscorePos != std::string::npos) {
                 extractedFilename = file.substr(0, underscorePos);
-                cout << "Extracted filename: " << extractedFilename << endl;
+                //cout << "Extracted filename: " << extractedFilename << endl;
             } else {
                 cout << "Underscore not found in the filename." << endl;
             }
@@ -249,7 +249,7 @@ void ls(vector<server_t> &servers) {
         }
         
         for (string element : dirs[i].list) {
-        std::cout << element << std::endl;
+        //std::cout << element << std::endl;
     }
     }
 
@@ -275,12 +275,12 @@ void put(string filename, vector<server_t> &servers) {
     long file_size = ftell(file);
     //Amount of bytes to send per chunk.
     long bytes_per_chunk = file_size / servers.size();
-    cout << "NUM SERVERS: " << servers.size();
+    //cout << "NUM SERVERS: " << servers.size();
     //Move the pointer back to the beginning.
     fseek(file, 0, SEEK_SET);
 
-    cout << "File Size: " << file_size << endl;
-    cout << "Bytes per Chunk: " << bytes_per_chunk << endl;
+    //cout << "File Size: " << file_size << endl;
+    //cout << "Bytes per Chunk: " << bytes_per_chunk << endl;
     hash<string> hasher;
     int x = hasher(filename) % servers.size();
 
@@ -290,7 +290,7 @@ void put(string filename, vector<server_t> &servers) {
         // 
         int server = (i + x) % servers.size();
         int server2 = (i + x + 1) % servers.size();
-        cout << "Chunk " << i << " going to server " << server << endl;
+        //cout << "Chunk " << i << " going to server " << server << endl;
         //Creating the socket
         if ((sockfd1 = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
             perror("Socket creation error");
@@ -350,15 +350,15 @@ void put(string filename, vector<server_t> &servers) {
             bytes_to_read = curr_chunk_size;
         }
 
-        cout << "BYTES BEING READ: " << bytes_to_read << endl;
+        //cout << "BYTES BEING READ: " << bytes_to_read << endl;
         while((bytes_read = fread(send_buf, sizeof(char), bytes_to_read, file)) > 0) {
             send(sockfd1, send_buf, bytes_read, 0);
             send(sockfd2, send_buf, bytes_read, 0);   
-            cout << "BYTES READ AND WRITTEN: " << bytes_read << endl;
+            //cout << "BYTES READ AND WRITTEN: " << bytes_read << endl;
 
             curr_chunk_size -= bytes_to_read;
-            cout << "CHUNK LEFT: " << curr_chunk_size << endl;
-            cout << "FILE POINTER: " << file->_offset << endl;
+           //cout << "CHUNK LEFT: " << curr_chunk_size << endl;
+            //cout << "FILE POINTER: " << file->_offset << endl;
             if(curr_chunk_size <= 0) break;
             
             //setting the amount of bytes to read from the file.
@@ -374,7 +374,8 @@ void put(string filename, vector<server_t> &servers) {
         close(sockfd1);
         close(sockfd2);
     }
-    fclose(file);
+    fclose(file);  
+    cout << "[SUCCESS] File Written." << endl;
 
 }
 
@@ -392,12 +393,12 @@ void get(string filename, vector<server_t> &servers) {
     for(int i = 0; i < servers.size(); i++) {
         sprintf(desired_file, "./cache/%s_%d", filename.c_str(), i);
         sprintf(send_buf, "get %s_%d\n", filename.c_str(), i);
-        cout << "DESIRED FILE: " << send_buf << endl;
+        //cout << "DESIRED FILE: " << send_buf << endl;
 
         
         for(int j = 0; j < servers.size(); j++) {
             //Creating the socket
-            cout << "ITERATION: " << j << endl;;
+            //cout << "ITERATION: " << j << endl;;
             //cout << servers.size() << endl;
             if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
                 perror("Socket creation error");
@@ -423,18 +424,18 @@ void get(string filename, vector<server_t> &servers) {
             sprintf(send_buf, "get %s_%d\n", filename.c_str(), i);
             send(sockfd, send_buf, strlen(send_buf), 0);
             bzero(send_buf, sizeof(send_buf));
-            cout << "HERE1" << endl;
+            //cout << "HERE1" << endl;
             rec = recv(sockfd, send_buf, sizeof(send_buf), 0);
             //bzero(send_buf, sizeof(send_buf));
-            cout << "HERE" << endl;
-            cout << send_buf << endl;
+            //cout << "HERE" << endl;
+            //cout << send_buf << endl;
             if(!strncmp(send_buf, "yes", 3)) {
-                cout << "YES" << endl;
+                //cout << "YES" << endl;
                 bzero(send_buf, sizeof(send_buf));
                 FILE* file = fopen(desired_file, "w");
                 while((rec = recv(sockfd, send_buf, sizeof(send_buf), 0)) > 0) {
                     
-                    cout << "WRITING" << endl;
+                    //cout << "WRITING" << endl;
                     fwrite(send_buf, sizeof(char), rec, file);
                     bzero(send_buf, sizeof(send_buf));
                 }
@@ -454,12 +455,12 @@ void get(string filename, vector<server_t> &servers) {
                 count++;
             }
         }
-        cout << count << endl;
+        //cout << count << endl;
         if(count == 0) {
             cout << "File cannot be completed." << endl;
             return;
         }
-        cout << "TEST" << endl;
+        //cout << "TEST" << endl;
         FILE* temp_file = fopen(desired_file, "r");
         bzero(send_buf, sizeof(send_buf));
         while((read_bytes = fread(send_buf, sizeof(char), sizeof(send_buf), temp_file)) > 0) {
@@ -468,5 +469,9 @@ void get(string filename, vector<server_t> &servers) {
         fclose(temp_file);
     }
     fclose(file_dest);
+    for (const auto& entry : std::filesystem::directory_iterator("./cache")) {
+        
+            std::filesystem::remove(entry.path()); 
+    }
     return;
 }
