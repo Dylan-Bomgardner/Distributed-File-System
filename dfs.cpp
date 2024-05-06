@@ -119,6 +119,18 @@ void * thread(void * vargp)
     }
     else if(!strncmp(command, "ls", 2)) {
         cout << "command is ls" << endl;
+        char dir_buf[MAXLINE];
+        DIR *directory = opendir(dir);
+        if (dir == NULL) {
+            cout << "Cannot open the directory." << endl;
+            return 1;
+        }
+        struct dirent *entry;
+        while ((entry = readdir(directory)) != NULL) {
+            printf("%s\n", entry->d_name);
+            sprintf(dir_buf, "%s%s\n", dir_buf, entry->d_name);
+        }
+        send(connfd, send_buf, sizeof(send_buf), 0);
     }
     else if(!strncmp(command, "put", 3)) {
         cout << "command is put" << endl;

@@ -30,7 +30,12 @@ struct server_t {
     bool available;
 };
 
-void ls();
+struct dir_list {
+    string name;
+    vector<string> list;
+};
+
+void ls(vector<server_t> &servers);
 
 void get(string filename, vector<server_t> &servers);
 

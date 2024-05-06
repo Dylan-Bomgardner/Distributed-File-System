@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
     vector<server_t> servers;
 
 
-    if(argc <= 2) {
+    if(argc < 2) {
         cout << argv[0] << " <command> [filename] ... [filename]" << endl;
         return -1;
     }
@@ -74,13 +74,11 @@ int main(int argc, char **argv) {
         close(sockfd);
             
     }
-    for(int i = 0, j = servers.size(); i < j; i++) {
-        if(servers[i].available == false) servers.erase(servers.begin() + i);
-    }
-    
+
+
 
     if(command == "ls") {
-        ls();
+        ls(servers);
     }
     else if(command == "get") {
         for(int i = 2; i < argc; i++) {
@@ -89,6 +87,9 @@ int main(int argc, char **argv) {
     }
     else if(command == "put") {
         for(int i = 2; i < argc; i++) {
+                for(int i = 0, j = servers.size(); i < j; i++) {
+                if(servers[i].available == false) servers.erase(servers.begin() + i);
+    }
             put(argv[i], servers);
         }
     }
@@ -139,7 +140,47 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-void ls() {
+void ls(vector<server_t> &servers) {
+    vector<dir_list> dirs;
+    int sockfd;
+    struct sockaddr_in server_addr;
+    char recv_buf[MAXLINE];
+    char temp_buf[MAXLINE];
+    char* extracted_string, *ptr;
+    for(int i = 0; i < servers.size(); i++) {
+        cout << "going to server " << i << endl;
+        //Creating the socket
+        if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            perror("Socket creation error");
+            exit(EXIT_FAILURE);
+        }
+        // Setup server address
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_port = htons(servers[i].port);
+        
+        //Setting the ip dest.
+        if (inet_pton(AF_INET,  servers[i].ip.c_str(), &server_addr.sin_addr) <= 0) {
+            perror("Invalid address / Address not supported");
+            close(sockfd);
+
+        }
+        
+        // Connect to server
+        if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
+            perror("Connection failed");
+            close(sockfd);
+        } 
+
+        send(sockfd, "ls", strlen("ls"), 0);
+        recv(sockfd, recv_buf, sizeof(recv_buf), 0);
+        extracted_string = strtok_r(recv_buf, "\n", &ptr);
+        while((extracted_string = strtok_r(NULL, "\n", &ptr)) != NULL) {
+            cout << extracted_string << endl;
+        }
+
+        close(sockfd);
+
+    }
     return;
 }
 
@@ -303,6 +344,7 @@ void get(string filename, vector<server_t> &servers) {
             // Connect to server
             if (connect(sockfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
                 perror("Connection failed");
+                continue;
                 close(sockfd);
             } 
             sprintf(send_buf, "get %s_%d\n", filename.c_str(), i);
@@ -344,13 +386,13 @@ void get(string filename, vector<server_t> &servers) {
             cout << "File cannot be completed." << endl;
             return;
         }
+        cout << "TEST" << endl;
         FILE* temp_file = fopen(desired_file, "r");
         bzero(send_buf, sizeof(send_buf));
         while((read_bytes = fread(send_buf, sizeof(char), sizeof(send_buf), temp_file)) > 0) {
             fwrite(send_buf, sizeof(char), read_bytes, file_dest);
         }
         fclose(temp_file);
-        
     }
     fclose(file_dest);
     return;
