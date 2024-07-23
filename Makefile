@@ -15,13 +15,13 @@ TARGET_DFC = dfc
 all: $(TARGET_DFS) $(TARGET_DFC)
 
 $(TARGET_DFS): $(OBJS_DFS)
-	$(CXX) $(CXXFLAGS) -o $(TARGET_DFS) $(OBJS_DFS)
+	$(CC) $(CFLAGS) -o $(TARGET_DFS) $(OBJS_DFS)
 
 $(TARGET_DFC): $(OBJS_DFC)
-	$(CXX) $(CXXFLAGS) -o $(TARGET_DFC) $(OBJS_DFC)
+	$(CC) $(CFLAGS) -o $(TARGET_DFC) $(OBJS_DFC)
 
 %.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
 	rm -f $(OBJS_DFS) $(OBJS_DFC) $(TARGET_DFS) $(TARGET_DFC)

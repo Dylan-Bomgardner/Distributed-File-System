@@ -1,1 +1,7 @@
 *.o 
+dfs*/
+.vscode/*
+.vscode
+cache/
+dfs
+dfc
